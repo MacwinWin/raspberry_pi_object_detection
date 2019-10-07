@@ -4,12 +4,16 @@
 # import the necessary packages
 from imutils.video import VideoStream
 from imutils.video import FPS
+from picamera.array import PiRGBArray
+from picamera import PiCamera
 import numpy as np
 import argparse
 import imutils
 import time
 import cv2
 
+IM_WIDTH = 400
+IM_HEIGHT = 300
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-p", "--prototxt", required=True,
@@ -42,15 +46,28 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_MYRIAD)
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
-vs = VideoStream(usePiCamera=True).start()
+#vs = VideoStream(usePiCamera=True).start()
+# Initialize Picamera and grab reference to the raw capture
+camera = PiCamera()
+camera.resolution = (IM_WIDTH,IM_HEIGHT)
+camera.framerate = 30
+camera.awb_mode = 'fluorescent'
+time.sleep(2.0)
+rawCapture = PiRGBArray(camera, size=(IM_WIDTH,IM_HEIGHT))
+# clear the stream in preparation for the next frame
+rawCapture.truncate(0)
 time.sleep(2.0)
 fps = FPS().start()
 
+
 # loop over the frames from the video stream
-while True:
+#while True:
+for frame1 in camera.capture_continuous(rawCapture, format="bgr",use_video_port=True):
     # grab the frame from the threaded video stream and resize it
     # to have a maximum width of 400 pixels
-    frame = vs.read()
+    #frame = vs.read()
+    #frame = np.copy(frame1.array)
+    frame = frame1.array
     frame = imutils.resize(frame, width=400)
     
     # grab the frame dimensions and convert it to a blob
@@ -64,39 +81,44 @@ while True:
     
     # loop over the detections
     for i in np.arange(0, detections.shape[2]):
-    # extract the confidence (i.e., probability) associated with
-    # the prediction
-    confidence = detections[0, 0, i, 2]
-    
-    # filter out weak detections by ensuring the `confidence` is
-    # greater than the minimum confidence
-    if confidence > args["confidence"]:
-        # extract the index of the class label from the
-        # `detections`, then compute the (x, y)-coordinates of
-        # the bounding box for the object
-        idx = int(detections[0, 0, i, 1])
-        box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-        (startX, startY, endX, endY) = box.astype("int")
+        # extract the confidence (i.e., probability) associated with
+        # the prediction
+        confidence = detections[0, 0, i, 2]
         
-        # draw the prediction on the frame
-        label = "{}: {:.2f}%".format(CLASSES[idx],
-            confidence * 100)
-        cv2.rectangle(frame, (startX, startY), (endX, endY),
-            COLORS[idx], 2)
-        y = startY - 15 if startY - 15 > 15 else startY + 15
-        cv2.putText(frame, label, (startX, y),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
+        # filter out weak detections by ensuring the `confidence` is
+        # greater than the minimum confidence
+        if confidence > args["confidence"]:
+            # extract the index of the class label from the
+            # `detections`, then compute the (x, y)-coordinates of
+            # the bounding box for the object
+            idx = int(detections[0, 0, i, 1])
+            box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+            (startX, startY, endX, endY) = box.astype("int")
+            
+            # draw the prediction on the frame
+            label = "{}: {:.2f}%".format(CLASSES[idx],
+                confidence * 100)
+            cv2.rectangle(frame, (startX, startY), (endX, endY),
+                COLORS[idx], 2)
+            y = startY - 15 if startY - 15 > 15 else startY + 15
+            cv2.putText(frame, label, (startX, y),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
         
-        # show the output frame
-        cv2.imshow("Frame", frame)
-        key = cv2.waitKey(1) & 0xFF
+    # show the output frame
+    cv2.imshow("Frame", frame)
+    key = cv2.waitKey(1) & 0xFF
 
-        # if the `q` key was pressed, break from the loop
-        if key == ord("q"):
-            break
-    
+    # if the `q` key was pressed, break from the loop
+    if key == ord("q"):
+        break
+   
+    # clear the stream in preparation for the next frame
+    rawCapture.truncate(0)
+
     # update the FPS counter
     fps.update()
+
+camera.close()
 
 # stop the timer and display FPS information
 fps.stop()
@@ -105,4 +127,3 @@ print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
 
 # do a bit of cleanup
 cv2.destroyAllWindows()
-vs.stop()
