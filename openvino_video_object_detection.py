@@ -2,6 +2,7 @@
 # python openvino_real_time_object_detection.py --prototxt MobileNetSSD_deploy.prototxt --model MobileNetSSD_deploy.caffemodel
 
 # import the necessary packages
+import os
 import sys
 from imutils.video import FileVideoStream
 from imutils.video import FPS
@@ -10,6 +11,9 @@ import argparse
 import imutils
 import time
 import cv2
+
+# 设置路径为当前目录
+os.chdir(sys.path[0])
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -43,7 +47,7 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_MYRIAD)
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
-vs = FileVideoStream('/home/pi/Git/raspberry_pi_object_detection/airbus.mp4').start()
+vs = FileVideoStream('./airbus.mp4').start()
 time.sleep(2.0)
 fps = FPS().start()
 
