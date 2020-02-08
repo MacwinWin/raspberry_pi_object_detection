@@ -13,7 +13,7 @@ import time
 import cv2
 
 # 设置路径为当前目录
-os.chdir(sys.path[0])
+#os.chdir(sys.path[0])
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -23,8 +23,10 @@ ap.add_argument("-m", "--model", required=True,
     help="path to Caffe pre-trained model")
 ap.add_argument("-c", "--confidence", type=float, default=0.2,
     help="minimum probability to filter weak detections")
-ap.add_argument("-u", "--movidius", type=bool, default=0,
-    help="boolean indicating if the Movidius should be used")
+ap.add_argument("-v", "--video", required=True,
+    help="absolute path to video")
+ap.add_argument("-d", "--device", required=True, choices = ['CPU', 'GPU', 'NCS'],
+    help="select x86 CPU, Nvidia GPU or Movidius NCS to run")
 args = vars(ap.parse_args())
 
 # initialize the list of class labels MobileNet SSD was trained to
@@ -39,15 +41,23 @@ COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
 print("[INFO] loading model...")
 net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 
-# specify the target device as the Myriad processor on the NCS
-net.setPreferableTarget(cv2.dnn.DNN_TARGET_MYRIAD)
-# use CPU(not work!!!)https://software.intel.com/en-us/forums/computer-vision/topic/814109
-# net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+if args["device"] == 'NCS':
+    # specify the target device as the Myriad processor on the NCS
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_MYRIAD)
+elif args["device"] == 'CPU':
+    # specify the target device as the CPU on the PC
+    # CPU on raspberry pi not worknot work!!!https://software.intel.com/en-us/forums/computer-vision/topic/814109
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+elif args["device"] == 'GPU':
+    # specify the target device as the Nvidia GPU on the PC
+    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+    #net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
 
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
-vs = FileVideoStream('./airbus.mp4').start()
+vs = FileVideoStream(args["video"]).start()
 time.sleep(2.0)
 fps = FPS().start()
 
